@@ -10,9 +10,13 @@ var server = app.listen(process.env.PORT || 8080, function() {
   console.log('App now running on port', port);
 });
 
-var apiURL = 'api.playbattlegrounds.com';
-var apiKey =
+const apiURL = 'api.playbattlegrounds.com';
+const apiKey =
   'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyYzI4Njg1MC0xOGNmLTAxMzYtZTdjMy0wMzMxODI1NzdmN2YiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTIyNjkyNjgyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InB1Ymctdmlld2VyIiwic2NvcGUiOiJjb21tdW5pdHkiLCJsaW1pdCI6MTB9.-W2PdClWJoDPNuSp1lA-45YPZkQLCGJbLiZOD5ouZ6s';
+const headers = {
+  Accept: 'application/vnd.api+json',
+  Authorization: `Bearer ${apiKey}`
+};
 
 // Generic error handler used by all endpoints.
 function handleError(res, reason, message, code) {
@@ -24,33 +28,31 @@ function handleError(res, reason, message, code) {
  *   get player by id
  */
 app.get('/api/player/:id', function(req, res) {
-  const headers = {
-    Accept: 'application/vnd.api+json',
-    Authorization: `Bearer ${apiKey}`
-  };
-  console.log(headers);
-  let rawData = '';
+  let shard = `${req.query.platform}-${req.query.region}`;
+  let username = req.params.id;
   const apireq = https
     .get(
       {
         hostname: apiURL,
-        path: `/shards/pc-na/players?filter[playerNames]=comanderguy`,
+        path: `/shards/${shard}/players?filter[playerNames]=${username}`,
         headers
       },
-      res => {
-        console.log('statusCode:', res.statusCode);
-        console.log('headers:', res.headers);
-
-        res.on('data', d => {
-          process.stdout.write(d);
+      response => {
+        response.on('data', d => {
+          const player = JSON.parse(d);
+          if (player.data && player.data.length > 0) {
+            res.status(200).json({ player: player.data[0] });
+          } else {
+            res.status(404).json({ player: null, error: player });
+          }
         });
       }
     )
     .on('error', e => {
-      console.error(e);
+      res.status(404).json({ player: null, error: JSON.parse(e) });
     });
 
-  res.status(200).json({ message: 'player route success' });
+  // res.status(200).json({ message: 'player route success' });
 });
 
 /*   "/api/player/:id"
