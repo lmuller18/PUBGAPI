@@ -39,11 +39,16 @@ app.get('/api/player/:id', function(req, res) {
       },
       response => {
         response.on('data', d => {
-          const player = JSON.parse(d);
-          if (player.data && player.data.length > 0) {
-            res.status(200).json({ player: player.data[0] });
+          const rawPlayer = JSON.parse(d);
+          if (rawPlayer.data && rawPlayer.data.length > 0) {
+            const player = {
+              name: rawPlayer.data[0].attributes.name,
+              id: rawPlayer.data[0].id,
+              matches: rawPlayer.data[0].relationships.matches.data
+            };
+            res.status(200).json({ player });
           } else {
-            res.status(404).json({ player: null, error: player });
+            res.status(404).json({ player: null, error: rawPlayer });
           }
         });
       }
