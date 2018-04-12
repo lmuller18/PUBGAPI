@@ -1,6 +1,7 @@
 # PUBGAPI
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 1.6.4.
+This is the RESTful server companion to the [PUBG Viewer app](https://github.com/lmuller18/PUBGViewer)
 
 ## Development server
 
