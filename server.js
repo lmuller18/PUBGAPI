@@ -1,6 +1,7 @@
 var express = require('express');
 var https = require('https');
 var bodyParser = require('body-parser');
+var reqProm = require('request-promise');
 
 var allowCrossDomain = function(req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
@@ -20,6 +21,7 @@ var allowCrossDomain = function(req, res, next) {
 
 var app = express();
 app.use(bodyParser.json());
+app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
 app.use(allowCrossDomain);
 
 var server = app.listen(process.env.PORT || 8080, function() {
@@ -45,8 +47,8 @@ function handleError(res, reason, message, code) {
  *   get player by id
  */
 app.get('/api/player/:id', function(req, res) {
-  let shard = `${req.query.platform}-${req.query.region}`;
-  let username = req.params.id;
+  const shard = `${req.query.platform}-${req.query.region}`;
+  const username = req.params.id;
   const apireq = https
     .get(
       {
@@ -84,6 +86,112 @@ app.get('/api/player/:id', function(req, res) {
 /*   "/api/player/:id"
  *    get matches by pipe seperated match id
  */
-app.get('/api/matches/:matches', function(req, res) {
-  res.status(200).json({ message: 'match route success' });
+app.get('/api/matches', function(req, res) {
+  const matchIds = req.query.matches.split('|');
+  const playerId = req.query.playerId;
+  const shard = `${req.query.platform}-${req.query.region}`;
+  const rawMatches = [];
+  const matchesToSearch = 3;
+  var options = {
+    headers: {
+      Accept: 'application/vnd.api+json',
+      Authorization: `Bearer ${apiKey}`
+    }
+  };
+
+  Promise.all(
+    matchIds.map((matchId, index) => {
+      if (index <= matchesToSearch) {
+        options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
+        return reqProm(options)
+          .then(response => {
+            rawMatches.push(JSON.parse(response));
+          })
+          .catch(e => {
+            res.status(404).json({ player: null, error: JSON.parse(e) });
+          });
+      }
+    })
+  )
+    .then(results => {
+      const matches = [];
+      rawMatches.forEach(rawMatch => {
+        // get list of all participants
+        const participantList = rawMatch.included.filter(element => {
+          return element.type === 'participant';
+        });
+
+        // get list of all rosters
+        const rosterList = rawMatch.included.filter(element => {
+          return element.type === 'roster';
+        });
+
+        // get participant object of current user
+        let playerParticipant = participantList.find(participant => {
+          return participant.attributes.stats.playerId === playerId;
+        });
+
+        if (!playerParticipant) return;
+
+        // format current player object
+        playerParticipant = {
+          stats: playerParticipant.attributes.stats,
+          id: playerParticipant.id
+        };
+
+        // find roster that player belongs to
+        const playerRoster = rosterList.find(roster => {
+          let found = false;
+          roster.relationships.participants.data.forEach(participant => {
+            if (participant.id === playerParticipant.id) found = true;
+          });
+          return found;
+        });
+
+        // find and format participant objects of player's teammates
+        const teammates = [];
+        playerRoster.relationships.participants.data.forEach(participant => {
+          const id = participant.id;
+          let teammateParticipant = participantList.find(teammate => {
+            return teammate.id === id;
+          });
+
+          teammates.push({
+            stats: teammateParticipant.attributes.stats,
+            id: teammateParticipant.id
+          });
+        });
+
+        const team = {
+          stats: {
+            won: playerRoster.attributes.won == 'true',
+            rank: playerRoster.attributes.stats.rank,
+            teamId: playerRoster.attributes.stats.teamId
+          },
+          teammates: teammates.sort(function(a, b) {
+            return a.id === playerParticipant.id
+              ? -1
+              : b.id == playerParticipant.id ? 1 : 0;
+          })
+        };
+
+        let duration = new Date(null);
+        duration.setSeconds(rawMatch.data.attributes.duration);
+        matches.push({
+          gameMode: rawMatch.data.attributes.gameMode,
+          duration: duration,
+          date: new Date(rawMatch.data.attributes.createdAt),
+          map: rawMatch.data.attributes.mapName,
+          player: playerParticipant,
+          team: team,
+          included: rawMatch.included
+        });
+      });
+      res
+        .status(200)
+        .json({ matches: matches.sort((a, b) => b.date - a.date) });
+    })
+    .catch(error => {
+      res.status(404).json({ error: error });
+    });
 });
