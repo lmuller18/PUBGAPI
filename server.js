@@ -83,6 +83,8 @@ app.get('/api/player/:id', function(req, res) {
   // res.status(200).json({ message: 'player route success' });
 });
 
+//I'm using cache-manager with cache-manager-fs for my caching by the way, in case you want to add caching as well
+
 /*   "/api/player/:id"
  *    get matches by pipe seperated match id
  */
@@ -183,8 +185,7 @@ app.get('/api/matches', function(req, res) {
           date: new Date(rawMatch.data.attributes.createdAt),
           map: rawMatch.data.attributes.mapName,
           player: playerParticipant,
-          team: team,
-          included: rawMatch.included
+          team: team
         });
       });
       res
