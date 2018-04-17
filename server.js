@@ -115,31 +115,31 @@ app.get('/api/matches', function(req, res) {
   const matchesToSearch = 3;
   const key = `matches:${req.query.matches}`;
   const rawMatches = [];
+  let searchedMatches = 0;
 
   Promise.all(
-    matchIds.map((matchId, index) => {
-      if (index <= matchesToSearch) {
+    matchIds.map(matchId => {
+      if (searchedMatches <= matchesToSearch) {
         const key = `match:${matchId}`;
         return cacheReady.then(cache => {
           return cache
             .wrap(
               key,
               () => {
+                searchedMatches++;
                 options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
                 return reqProm(options)
                   .then(response => {
                     return JSON.parse(response);
                   })
                   .catch(e => {
-                    res
-                      .status(404)
-                      .json({ player: null, error: JSON.parse(e) });
+                    return undefined;
                   });
               },
               { ttl: 1000 * 1000 }
             )
             .then(match => {
-              if (match.data) {
+              if (match) {
                 rawMatches.push(match);
               }
             });
