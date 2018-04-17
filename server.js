@@ -105,7 +105,6 @@ app.get('/api/matches', function(req, res) {
   const matchIds = req.query.matches.split('|');
   const playerId = req.query.playerId;
   const shard = `${req.query.platform}-${req.query.region}`;
-  const rawMatches = [];
   const matchesToSearch = 3;
   var options = {
     headers: {
@@ -115,36 +114,36 @@ app.get('/api/matches', function(req, res) {
   };
 
   const key = `matches:${req.query.matches}`;
+  const rawMatches = [];
 
-  diskCache
-    .wrap(key, function() {
-      return Promise.all(
-        matchIds.map((matchId, index) => {
-          if (index <= matchesToSearch) {
+  Promise.all(
+    matchIds.map((matchId, index) => {
+      if (index <= matchesToSearch) {
+        const key = `match:${matchId}`;
+        return diskCache
+          .wrap(key, () => {
             options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
             return reqProm(options)
               .then(response => {
-                rawMatches.push(JSON.parse(response));
+                return JSON.parse(response);
               })
               .catch(e => {
                 res.status(404).json({ player: null, error: JSON.parse(e) });
               });
-          }
-        })
-      )
-        .then(results => {
-          return { matches: formatMatches(rawMatches, playerId) };
-        })
-        .catch(error => {
-          return error;
-        });
-    })
-    .then(function(matchesResponse) {
-      if (matchesResponse.matches) {
-        res.status(200).json(matchesResponse);
-      } else {
-        res.status(404).json({ error: matchesResponse.error });
+          })
+          .then(match => {
+            if (match.data) {
+              rawMatches.push(match);
+            }
+          });
       }
+    })
+  )
+    .then(results => {
+      res.status(200).json({ matches: formatMatches(rawMatches, playerId) });
+    })
+    .catch(error => {
+      res.status(404).json({ error: error });
     });
 });
 
