@@ -40,14 +40,16 @@ const headers = {
 var cacheManager = require('cache-manager');
 var fsStore = require('cache-manager-fs');
 // initialize caching on disk
-var diskCache = cacheManager.caching({
-  store: fsStore,
-  options: {
-    ttl: 60 * 60 /* seconds */,
-    maxsize: 1000 * 1000 * 1000 /* max size in bytes on disk */,
-    path: 'diskcache',
-    preventfill: true
-  }
+const cacheReady = new Promise((resolve, reject) => {
+  const cache = cacheManager.caching({
+    store: fsStore,
+    options: {
+      ttl: 60 * 60 /* seconds */,
+      maxsize: 1000 * 1000 * 1000 /* max size in bytes on disk */,
+      path: './cache',
+      fillcallback: () => resolve(cache)
+    }
+  });
 });
 
 // Generic error handler used by all endpoints.
@@ -120,22 +122,30 @@ app.get('/api/matches', function(req, res) {
     matchIds.map((matchId, index) => {
       if (index <= matchesToSearch) {
         const key = `match:${matchId}`;
-        return diskCache
-          .wrap(key, () => {
-            options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
-            return reqProm(options)
-              .then(response => {
-                return JSON.parse(response);
-              })
-              .catch(e => {
-                res.status(404).json({ player: null, error: JSON.parse(e) });
-              });
-          })
-          .then(match => {
-            if (match.data) {
-              rawMatches.push(match);
-            }
-          });
+        return cacheReady.then(cache => {
+          return cache
+            .wrap(
+              key,
+              () => {
+                options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
+                return reqProm(options)
+                  .then(response => {
+                    return JSON.parse(response);
+                  })
+                  .catch(e => {
+                    res
+                      .status(404)
+                      .json({ player: null, error: JSON.parse(e) });
+                  });
+              },
+              { ttl: 1000 * 1000 }
+            )
+            .then(match => {
+              if (match.data) {
+                rawMatches.push(match);
+              }
+            });
+        });
       }
     })
   )
