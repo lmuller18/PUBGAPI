@@ -81,6 +81,8 @@ app.get('/api/player/:id', function(req, res) {
               const player = {
                 name: rawPlayer.data[0].attributes.name,
                 id: rawPlayer.data[0].id,
+                region: req.query.region,
+                platform: req.query.platform,
                 matches: rawPlayer.data[0].relationships.matches.data
               };
               res.status(200).json({ player });
