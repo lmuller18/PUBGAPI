@@ -37,6 +37,19 @@ const headers = {
   Authorization: `Bearer ${apiKey}`
 };
 
+var cacheManager = require('cache-manager');
+var fsStore = require('cache-manager-fs');
+// initialize caching on disk
+var diskCache = cacheManager.caching({
+  store: fsStore,
+  options: {
+    ttl: 60 * 60 /* seconds */,
+    maxsize: 1000 * 1000 * 1000 /* max size in bytes on disk */,
+    path: 'diskcache',
+    preventfill: true
+  }
+});
+
 // Generic error handler used by all endpoints.
 function handleError(res, reason, message, code) {
   console.log('ERROR: ' + reason);
@@ -101,98 +114,114 @@ app.get('/api/matches', function(req, res) {
     }
   };
 
-  Promise.all(
-    matchIds.map((matchId, index) => {
-      if (index <= matchesToSearch) {
-        options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
-        return reqProm(options)
-          .then(response => {
-            rawMatches.push(JSON.parse(response));
-          })
-          .catch(e => {
-            res.status(404).json({ player: null, error: JSON.parse(e) });
-          });
+  const key = `matches:${req.query.matches}`;
+
+  diskCache
+    .wrap(key, function() {
+      return Promise.all(
+        matchIds.map((matchId, index) => {
+          if (index <= matchesToSearch) {
+            options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
+            return reqProm(options)
+              .then(response => {
+                rawMatches.push(JSON.parse(response));
+              })
+              .catch(e => {
+                res.status(404).json({ player: null, error: JSON.parse(e) });
+              });
+          }
+        })
+      )
+        .then(results => {
+          return { matches: formatMatches(rawMatches, playerId) };
+        })
+        .catch(error => {
+          return error;
+        });
+    })
+    .then(function(matchesResponse) {
+      if (matchesResponse.matches) {
+        res.status(200).json(matchesResponse);
+      } else {
+        res.status(404).json({ error: matchesResponse.error });
       }
-    })
-  )
-    .then(results => {
-      const matches = [];
-      rawMatches.forEach(rawMatch => {
-        // get list of all participants
-        const participantList = rawMatch.included.filter(element => {
-          return element.type === 'participant';
-        });
-
-        // get list of all rosters
-        const rosterList = rawMatch.included.filter(element => {
-          return element.type === 'roster';
-        });
-
-        // get participant object of current user
-        let playerParticipant = participantList.find(participant => {
-          return participant.attributes.stats.playerId === playerId;
-        });
-
-        if (!playerParticipant) return;
-
-        // format current player object
-        playerParticipant = {
-          stats: playerParticipant.attributes.stats,
-          id: playerParticipant.id
-        };
-
-        // find roster that player belongs to
-        const playerRoster = rosterList.find(roster => {
-          let found = false;
-          roster.relationships.participants.data.forEach(participant => {
-            if (participant.id === playerParticipant.id) found = true;
-          });
-          return found;
-        });
-
-        // find and format participant objects of player's teammates
-        const teammates = [];
-        playerRoster.relationships.participants.data.forEach(participant => {
-          const id = participant.id;
-          let teammateParticipant = participantList.find(teammate => {
-            return teammate.id === id;
-          });
-
-          teammates.push({
-            stats: teammateParticipant.attributes.stats,
-            id: teammateParticipant.id
-          });
-        });
-
-        const team = {
-          stats: {
-            won: playerRoster.attributes.won == 'true',
-            rank: playerRoster.attributes.stats.rank,
-            teamId: playerRoster.attributes.stats.teamId
-          },
-          teammates: teammates.sort(function(a, b) {
-            return a.id === playerParticipant.id
-              ? -1
-              : b.id == playerParticipant.id ? 1 : 0;
-          })
-        };
-
-        let duration = new Date(null);
-        duration.setSeconds(rawMatch.data.attributes.duration);
-        matches.push({
-          gameMode: rawMatch.data.attributes.gameMode,
-          duration: duration,
-          date: new Date(rawMatch.data.attributes.createdAt),
-          map: rawMatch.data.attributes.mapName,
-          player: playerParticipant,
-          team: team
-        });
-      });
-      res
-        .status(200)
-        .json({ matches: matches.sort((a, b) => b.date - a.date) });
-    })
-    .catch(error => {
-      res.status(404).json({ error: error });
     });
 });
+
+function formatMatches(rawMatches, playerId) {
+  const matches = [];
+  rawMatches.forEach(rawMatch => {
+    // get list of all participants
+    const participantList = rawMatch.included.filter(element => {
+      return element.type === 'participant';
+    });
+
+    // get list of all rosters
+    const rosterList = rawMatch.included.filter(element => {
+      return element.type === 'roster';
+    });
+
+    // get participant object of current user
+    let playerParticipant = participantList.find(participant => {
+      return participant.attributes.stats.playerId === playerId;
+    });
+
+    if (!playerParticipant) return;
+
+    // format current player object
+    playerParticipant = {
+      stats: playerParticipant.attributes.stats,
+      id: playerParticipant.id
+    };
+
+    // find roster that player belongs to
+    const playerRoster = rosterList.find(roster => {
+      let found = false;
+      roster.relationships.participants.data.forEach(participant => {
+        if (participant.id === playerParticipant.id) found = true;
+      });
+      return found;
+    });
+
+    // find and format participant objects of player's teammates
+    const teammates = [];
+    playerRoster.relationships.participants.data.forEach(participant => {
+      const id = participant.id;
+      let teammateParticipant = participantList.find(teammate => {
+        return teammate.id === id;
+      });
+
+      teammates.push({
+        stats: teammateParticipant.attributes.stats,
+        id: teammateParticipant.id
+      });
+    });
+
+    const team = {
+      stats: {
+        won: playerRoster.attributes.won == 'true',
+        rank: playerRoster.attributes.stats.rank,
+        teamId: playerRoster.attributes.stats.teamId
+      },
+      teammates: teammates.sort(function(a, b) {
+        return a.id === playerParticipant.id
+          ? -1
+          : b.id == playerParticipant.id
+            ? 1
+            : 0;
+      })
+    };
+
+    let duration = new Date(null);
+    duration.setSeconds(rawMatch.data.attributes.duration);
+    matches.push({
+      gameMode: rawMatch.data.attributes.gameMode,
+      duration: duration,
+      date: new Date(rawMatch.data.attributes.createdAt),
+      map: rawMatch.data.attributes.mapName,
+      player: playerParticipant,
+      team: team
+    });
+  });
+  return matches.sort((a, b) => b.date - a.date);
+}
