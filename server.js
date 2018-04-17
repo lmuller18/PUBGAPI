@@ -44,13 +44,20 @@ const cacheReady = new Promise((resolve, reject) => {
   const cache = cacheManager.caching({
     store: fsStore,
     options: {
-      ttl: 60 * 60 /* seconds */,
+      ttl: 300,
       maxsize: 1000 * 1000 * 1000 /* max size in bytes on disk */,
       path: './cache',
       fillcallback: () => resolve(cache)
     }
   });
 });
+
+const options = {
+  headers: {
+    Accept: 'application/vnd.api+json',
+    Authorization: `Bearer ${apiKey}`
+  }
+};
 
 // Generic error handler used by all endpoints.
 function handleError(res, reason, message, code) {
@@ -64,43 +71,39 @@ function handleError(res, reason, message, code) {
 app.get('/api/player/:id', function(req, res) {
   const shard = `${req.query.platform}-${req.query.region}`;
   const username = req.params.id;
-  const apireq = https
-    .get(
-      {
-        hostname: apiURL,
-        path: `/shards/${shard}/players?filter[playerNames]=${username}`,
-        headers
-      },
-      response => {
-        if (response.statusCode === 429) {
-          res.status(404).json({ player: null, error: 'Too many requests' });
-        } else {
-          response.on('data', d => {
-            const rawPlayer = JSON.parse(d);
-            if (rawPlayer.data && rawPlayer.data.length > 0) {
-              const player = {
-                name: rawPlayer.data[0].attributes.name,
-                id: rawPlayer.data[0].id,
-                region: req.query.region,
-                platform: req.query.platform,
-                matches: rawPlayer.data[0].relationships.matches.data
-              };
-              res.status(200).json({ player });
-            } else {
-              res.status(404).json({ player: null, error: rawPlayer });
-            }
+
+  const key = `player:${shard}-${username}`;
+  cacheReady.then(cache => {
+    return cache
+      .wrap(key, () => {
+        options.uri = `https://${apiURL}/shards/${shard}/players?filter[playerNames]=${username}`;
+        return reqProm(options)
+          .then(response => {
+            return JSON.parse(response);
+          })
+          .catch(e => {
+            return JSON.parse(e);
           });
+      })
+      .then(rawPlayer => {
+        if (rawPlayer.data && rawPlayer.data.length > 0) {
+          const player = {
+            name: rawPlayer.data[0].attributes.name,
+            id: rawPlayer.data[0].id,
+            region: req.query.region,
+            platform: req.query.platform,
+            matches: rawPlayer.data[0].relationships.matches.data
+          };
+          res.status(200).json({ player });
+        } else {
+          res.status(404).json({ error: rawPlayer });
         }
-      }
-    )
-    .on('error', e => {
-      res.status(404).json({ player: null, error: JSON.parse(e) });
-    });
-
-  // res.status(200).json({ message: 'player route success' });
+      })
+      .catch(e => {
+        res.status(404).json({ error: e });
+      });
+  });
 });
-
-//I'm using cache-manager with cache-manager-fs for my caching by the way, in case you want to add caching as well
 
 /*   "/api/player/:id"
  *    get matches by pipe seperated match id
@@ -110,13 +113,6 @@ app.get('/api/matches', function(req, res) {
   const playerId = req.query.playerId;
   const shard = `${req.query.platform}-${req.query.region}`;
   const matchesToSearch = 3;
-  var options = {
-    headers: {
-      Accept: 'application/vnd.api+json',
-      Authorization: `Bearer ${apiKey}`
-    }
-  };
-
   const key = `matches:${req.query.matches}`;
   const rawMatches = [];
 
