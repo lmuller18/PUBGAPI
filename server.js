@@ -133,7 +133,7 @@ app.get('/api/matches', function(req, res) {
                     return JSON.parse(response);
                   })
                   .catch(e => {
-                    return undefined;
+                    return null;
                   });
               },
               { ttl: 1000 * 1000 }
@@ -148,7 +148,11 @@ app.get('/api/matches', function(req, res) {
     })
   )
     .then(results => {
-      res.status(200).json({ matches: formatMatches(rawMatches, playerId) });
+      if (rawMatches.length > 1) {
+        res.status(200).json({ matches: formatMatches(rawMatches, playerId) });
+      } else {
+        res.status(404).json({ error: 'no matches' });
+      }
     })
     .catch(error => {
       res.status(404).json({ error: error });
