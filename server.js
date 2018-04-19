@@ -159,6 +159,33 @@ app.get('/api/matches', function(req, res) {
     });
 });
 
+/**
+ * Get match telemetry data
+ * id: telemetry url
+ */
+app.get('/api/telemetry', function(req, res) {
+  const telemUri = req.query.uri;
+  const teammateIds = req.query.teammates.split('|');
+
+  options.uri = telemUri;
+  reqProm(options)
+    .then(response => {
+      const telemetry = JSON.parse(response);
+      let teamAttacks = {};
+      teammateIds.forEach(player => {
+        teamAttacks[player] = telemetry.filter(element => {
+          return (
+            element._T === 'LogPlayerAttack' && element.attacker.name === player
+          );
+        });
+      });
+      res.status(200).json(teamAttacks);
+    })
+    .catch(e => {
+      res.status(200).json({ error: e });
+    });
+});
+
 function formatMatches(rawMatches, playerId) {
   const matches = [];
   rawMatches.forEach(rawMatch => {
