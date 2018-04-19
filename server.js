@@ -223,6 +223,10 @@ function formatMatches(rawMatches, playerId) {
       })
     };
 
+    const telemUrl = rawMatch.included.find(element => {
+      return element.type === 'asset';
+    }).attributes.URL;
+
     let duration = new Date(null);
     duration.setSeconds(rawMatch.data.attributes.duration);
     matches.push({
@@ -231,7 +235,8 @@ function formatMatches(rawMatches, playerId) {
       date: new Date(rawMatch.data.attributes.createdAt),
       map: rawMatch.data.attributes.mapName,
       player: playerParticipant,
-      team: team
+      team: team,
+      telemUrl
     });
   });
   return matches.sort((a, b) => b.date - a.date);
