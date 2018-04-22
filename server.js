@@ -185,6 +185,12 @@ app.get('/api/telemetry', function(req, res) {
             const sameWeapon = playerAttacks.filter(weapon => {
               return attack.damageCauserName === weapon.damageCauserName;
             });
+            sameWeapon.forEach((weap, index) => {
+              const x = telemetry.find(element => {
+                return element.attackId === weap.attackId;
+              });
+              sameWeapon[index].attacker = x.attacker;
+            });
             aggregatedAttacks[attack.damageCauserName] = sameWeapon;
           }
         });
