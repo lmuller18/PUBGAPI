@@ -175,7 +175,8 @@ app.get('/api/telemetry', function(req, res) {
       teammateIds.forEach(player => {
         teamAttacks[player] = telemetry.filter(element => {
           return (
-            element._T === 'LogPlayerAttack' && element.attacker.name === player
+            element._T === 'LogPlayerTakeDamage' &&
+            element.attacker.name === player
           );
         });
       });
