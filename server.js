@@ -173,12 +173,25 @@ app.get('/api/telemetry', function(req, res) {
       const telemetry = JSON.parse(response);
       let teamAttacks = {};
       teammateIds.forEach(player => {
-        teamAttacks[player] = telemetry.filter(element => {
+        const playerAttacks = telemetry.filter(element => {
           return (
             element._T === 'LogPlayerTakeDamage' &&
             element.attacker.name === player
           );
         });
+        const aggregatedAttacks = {};
+        playerAttacks.forEach(attack => {
+          if (!aggregatedAttacks[attack.damageCauserName]) {
+            const sameWeapon = playerAttacks.filter(weapon => {
+              return attack.damageCauserName === weapon.damageCauserName;
+            });
+            aggregatedAttacks[attack.damageCauserName] = sameWeapon;
+          }
+        });
+
+        teamAttacks[player] = teamAttacks[player] = Object.entries(
+          aggregatedAttacks
+        ).reduce((arr, [key, value]) => [...arr, value], []);
       });
       res.status(200).json(teamAttacks);
     })
