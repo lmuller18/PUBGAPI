@@ -114,6 +114,7 @@ app.get('/api/matches', function(req, res) {
   const shard = `${req.query.platform}-${req.query.region}`;
   const matchesToSearch = 3;
   const key = `matches:${req.query.matches}`;
+  // const key = `matches:${req.query.matches}`;
   const rawMatches = [];
   let searchedMatches = 0;
 
@@ -171,7 +172,8 @@ app.get('/api/telemetry', function(req, res) {
   reqProm(options)
     .then(response => {
       const telemetry = JSON.parse(response);
-      let teamAttacks = {};
+      const teamAttacks = {};
+      const teamKills = {};
       teammateIds.forEach(player => {
         const playerAttacks = telemetry.filter(element => {
           return (
@@ -179,6 +181,13 @@ app.get('/api/telemetry', function(req, res) {
             element.attacker.name === player
           );
         });
+
+        teamKills[player] = telemetry.filter(element => {
+          return (
+            element._T === 'LogPlayerKill' && element.killer.name === player
+          );
+        });
+
         const aggregatedAttacks = {};
         playerAttacks.forEach(attack => {
           if (!aggregatedAttacks[attack.damageCauserName]) {
@@ -195,11 +204,12 @@ app.get('/api/telemetry', function(req, res) {
           }
         });
 
-        teamAttacks[player] = teamAttacks[player] = Object.entries(
-          aggregatedAttacks
-        ).reduce((arr, [key, value]) => [...arr, value], []);
+        teamAttacks[player] = Object.entries(aggregatedAttacks).reduce(
+          (arr, [key, value]) => [...arr, value],
+          []
+        );
       });
-      res.status(200).json(teamAttacks);
+      res.status(200).json({ teamAttacks, teamKills });
     })
     .catch(e => {
       res.status(200).json({ error: e });
