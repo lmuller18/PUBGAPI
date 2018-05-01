@@ -174,7 +174,15 @@ app.get('/api/telemetry', function(req, res) {
       const telemetry = JSON.parse(response);
       const teamAttacks = {};
       const teamKills = {};
+      const teamMovements = {};
       teammateIds.forEach(player => {
+        teamMovements[player] = telemetry.filter(element => {
+          return (
+            element._T === 'LogPlayerPosition' &&
+            element.character.name === player
+          );
+        });
+
         const playerAttacks = telemetry.filter(element => {
           return (
             element._T === 'LogPlayerTakeDamage' &&
@@ -209,7 +217,7 @@ app.get('/api/telemetry', function(req, res) {
           []
         );
       });
-      res.status(200).json({ teamAttacks, teamKills });
+      res.status(200).json({ teamAttacks, teamKills, teamMovements });
     })
     .catch(e => {
       res.status(200).json({ error: e });
