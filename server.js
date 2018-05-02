@@ -176,10 +176,19 @@ app.get('/api/telemetry', function(req, res) {
       const teamKills = {};
       const teamMovements = {};
       teammateIds.forEach(player => {
+        const jumpTime = telemetry.find(element => {
+          return (
+            element._T === 'LogVehicleLeave' &&
+            element.vehicle.vehicleId === 'DummyTransportAircraft_C' &&
+            element.character.name === player
+          );
+        })._D;
+
         teamMovements[player] = telemetry.filter(element => {
           return (
             element._T === 'LogPlayerPosition' &&
-            element.character.name === player
+            element.character.name === player &&
+            element._D >= jumpTime
           );
         });
 
