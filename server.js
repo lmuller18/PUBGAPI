@@ -65,6 +65,83 @@ function handleError(res, reason, message, code) {
   res.status(code || 500).json({ error: message });
 }
 
+app.get('/api/seasons', function(req, res) {
+  const shard = `${req.query.platform}-${req.query.region}`;
+  const seasonKey = `season-list`;
+  cacheReady
+    .then(seasonListCache => {
+      return seasonListCache
+        .wrap(
+          seasonKey,
+          () => {
+            options.uri = `https://${apiURL}/shards/${shard}/seasons`;
+            return reqProm(options)
+              .then(response => {
+                return JSON.parse(response);
+              })
+              .catch(e => {
+                return JSON.parse(e);
+              });
+          },
+          { ttl: 86400 }
+        )
+        .then(seasonList => {
+          if (seasonList.data && seasonList.data.length > 0) {
+            res.status(200).json({ seasons: seasonList.data });
+          } else {
+            return Promise.reject(seasonList);
+          }
+        })
+        .catch(e => {
+          res.status(404).json({ error: e });
+        });
+    })
+    .catch(e => {
+      res.status(404).json({ error: e });
+    });
+});
+
+app.get('/api/player-details/:id', function(req, res) {
+  const shard = `${req.query.platform}-${req.query.region}`;
+  const id = req.params.id;
+  const season = req.query.season;
+  const isCurrent = req.query.current;
+  const key = `player-details:${id}-${season}`;
+  cacheReady
+    .then(seasonListCache => {
+      return seasonListCache
+        .wrap(
+          key,
+          () => {
+            options.uri = `https://${apiURL}/shards/${shard}/players/${id}/seasons/${season}`;
+            return reqProm(options)
+              .then(response => {
+                return JSON.parse(response);
+              })
+              .catch(e => {
+                return JSON.parse(e);
+              });
+          },
+          { ttl: isCurrent ? 300 : 1000 * 1000 }
+        )
+        .then(seasonList => {
+          if (seasonList.data && seasonList.data.attributes) {
+            res
+              .status(200)
+              .json({ stats: seasonList.data.attributes.gameModeStats });
+          } else {
+            return Promise.reject(seasonList);
+          }
+        })
+        .catch(e => {
+          res.status(404).json({ error: e });
+        });
+    })
+    .catch(e => {
+      res.status(404).json({ error: e });
+    });
+});
+
 /*  "/api/player/:id"
  *   get player by id
  */
