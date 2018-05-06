@@ -2,7 +2,8 @@ var express = require('express');
 var https = require('https');
 var bodyParser = require('body-parser');
 var reqProm = require('request-promise');
-
+require('dotenv').config();
+const apiKey = process.env.apiKey;
 var allowCrossDomain = function(req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
@@ -30,8 +31,6 @@ var server = app.listen(process.env.PORT || 8080, function() {
 });
 
 const apiURL = 'api.playbattlegrounds.com';
-const apiKey =
-  'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyYzI4Njg1MC0xOGNmLTAxMzYtZTdjMy0wMzMxODI1NzdmN2YiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTIyNjkyNjgyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InB1Ymctdmlld2VyIiwic2NvcGUiOiJjb21tdW5pdHkiLCJsaW1pdCI6MTB9.-W2PdClWJoDPNuSp1lA-45YPZkQLCGJbLiZOD5ouZ6s';
 const headers = {
   Accept: 'application/vnd.api+json',
   Authorization: `Bearer ${apiKey}`
