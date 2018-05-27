@@ -243,6 +243,13 @@ app.get('/api/matches', function(req, res) {
 app.get('/api/telemetry', function(req, res) {
   const telemUri = req.query.uri;
   const teammateIds = req.query.teammates.split('|');
+  let enemyIds = req.query.enemies;
+  if (enemyIds !== 'null' && enemyIds !== '') {
+    enemyIds = enemyIds.split('|');
+  } else {
+    enemyIds = null;
+  }
+  console.log(enemyIds);
 
   options.uri = telemUri;
   reqProm(options)
@@ -251,6 +258,11 @@ app.get('/api/telemetry', function(req, res) {
       const teamAttacks = {};
       const teamKills = {};
       const teamMovements = {};
+
+      const enemyAttacks = {};
+      const enemyKills = {};
+      const enemyMovements = {};
+
       teammateIds.forEach(player => {
         const jumpTime = telemetry.find(element => {
           return (
@@ -302,7 +314,69 @@ app.get('/api/telemetry', function(req, res) {
           []
         );
       });
-      res.status(200).json({ teamAttacks, teamKills, teamMovements });
+
+      if (enemyIds) {
+        enemyIds.forEach(player => {
+          console.log('here', player);
+          const jumpTime = telemetry.find(element => {
+            return (
+              element._T === 'LogVehicleLeave' &&
+              element.vehicle.vehicleId === 'DummyTransportAircraft_C' &&
+              element.character.name === player
+            );
+          })._D;
+
+          enemyMovements[player] = telemetry.filter(element => {
+            return (
+              element._T === 'LogPlayerPosition' &&
+              element.character.name === player &&
+              element._D >= jumpTime
+            );
+          });
+
+          const enemyAttacks = telemetry.filter(element => {
+            return (
+              element._T === 'LogPlayerTakeDamage' &&
+              element.attacker.name === player
+            );
+          });
+
+          enemyKills[player] = telemetry.filter(element => {
+            return (
+              element._T === 'LogPlayerKill' && element.killer.name === player
+            );
+          });
+
+          const aggregatedAttacks = {};
+          enemyAttacks.forEach(attack => {
+            if (!aggregatedAttacks[attack.damageCauserName]) {
+              const sameWeapon = enemyAttacks.filter(weapon => {
+                return attack.damageCauserName === weapon.damageCauserName;
+              });
+              sameWeapon.forEach((weap, index) => {
+                const x = telemetry.find(element => {
+                  return element.attackId === weap.attackId;
+                });
+                sameWeapon[index].attacker = x.attacker;
+              });
+              aggregatedAttacks[attack.damageCauserName] = sameWeapon;
+            }
+          });
+
+          enemyAttacks[player] = Object.entries(aggregatedAttacks).reduce(
+            (arr, [key, value]) => [...arr, value],
+            []
+          );
+        });
+      }
+      res.status(200).json({
+        teamAttacks,
+        teamKills,
+        teamMovements,
+        enemyAttacks,
+        enemyKills,
+        enemyMovements
+      });
     })
     .catch(e => {
       res.status(200).json({ error: e });
@@ -360,7 +434,7 @@ function formatMatches(rawMatches, playerId) {
 
     const team = {
       stats: {
-        won: playerRoster.attributes.won == 'true',
+        won: playerRoster.attributes.won === 'true',
         rank: playerRoster.attributes.stats.rank,
         teamId: playerRoster.attributes.stats.teamId
       },
@@ -372,6 +446,35 @@ function formatMatches(rawMatches, playerId) {
             : 0;
       })
     };
+
+    let enemies = {};
+    if (!team.stats.won) {
+      const enemyRoster = rosterList.find(
+        roster => roster.attributes.won === 'true'
+      );
+
+      const enemyTeammates = [];
+      enemyRoster.relationships.participants.data.forEach(participant => {
+        const id = participant.id;
+        let teammateParticipant = participantList.find(teammate => {
+          return teammate.id === id;
+        });
+
+        enemyTeammates.push({
+          stats: teammateParticipant.attributes.stats,
+          id: teammateParticipant.id
+        });
+      });
+
+      enemies = {
+        stats: {
+          won: enemyRoster.attributes.won === 'true',
+          rank: enemyRoster.attributes.stats.rank,
+          teamId: enemyRoster.attributes.stats.teamId
+        },
+        teammates: enemyTeammates
+      };
+    }
 
     const telemUrl = rawMatch.included.find(element => {
       return element.type === 'asset';
@@ -386,6 +489,7 @@ function formatMatches(rawMatches, playerId) {
       map: rawMatch.data.attributes.mapName,
       player: playerParticipant,
       team: team,
+      enemies,
       telemUrl
     });
   });
