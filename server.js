@@ -249,7 +249,6 @@ app.get('/api/telemetry', function(req, res) {
   } else {
     enemyIds = null;
   }
-  console.log(enemyIds);
 
   options.uri = telemUri;
   reqProm(options)
@@ -317,7 +316,6 @@ app.get('/api/telemetry', function(req, res) {
 
       if (enemyIds) {
         enemyIds.forEach(player => {
-          console.log('here', player);
           const jumpTime = telemetry.find(element => {
             return (
               element._T === 'LogVehicleLeave' &&
@@ -385,113 +383,119 @@ app.get('/api/telemetry', function(req, res) {
 
 function formatMatches(rawMatches, playerId) {
   const matches = [];
-  rawMatches.forEach(rawMatch => {
-    // get list of all participants
-    const participantList = rawMatch.included.filter(element => {
-      return element.type === 'participant';
-    });
-
-    // get list of all rosters
-    const rosterList = rawMatch.included.filter(element => {
-      return element.type === 'roster';
-    });
-
-    // get participant object of current user
-    let playerParticipant = participantList.find(participant => {
-      return participant.attributes.stats.playerId === playerId;
-    });
-
-    if (!playerParticipant) return;
-
-    // format current player object
-    playerParticipant = {
-      stats: playerParticipant.attributes.stats,
-      id: playerParticipant.id
-    };
-
-    // find roster that player belongs to
-    const playerRoster = rosterList.find(roster => {
-      let found = false;
-      roster.relationships.participants.data.forEach(participant => {
-        if (participant.id === playerParticipant.id) found = true;
-      });
-      return found;
-    });
-
-    // find and format participant objects of player's teammates
-    const teammates = [];
-    playerRoster.relationships.participants.data.forEach(participant => {
-      const id = participant.id;
-      let teammateParticipant = participantList.find(teammate => {
-        return teammate.id === id;
+  try {
+    rawMatches.forEach(rawMatch => {
+      // get list of all participants
+      const participantList = rawMatch.included.filter(element => {
+        return element.type === 'participant';
       });
 
-      teammates.push({
-        stats: teammateParticipant.attributes.stats,
-        id: teammateParticipant.id
+      // get list of all rosters
+      const rosterList = rawMatch.included.filter(element => {
+        return element.type === 'roster';
       });
-    });
 
-    const team = {
-      stats: {
-        won: playerRoster.attributes.won === 'true',
-        rank: playerRoster.attributes.stats.rank,
-        teamId: playerRoster.attributes.stats.teamId
-      },
-      teammates: teammates.sort(function(a, b) {
-        return a.id === playerParticipant.id
-          ? -1
-          : b.id == playerParticipant.id
-            ? 1
-            : 0;
-      })
-    };
+      // get participant object of current user
+      let playerParticipant = participantList.find(participant => {
+        return participant.attributes.stats.playerId === playerId;
+      });
 
-    let enemies = {};
-    if (!team.stats.won) {
-      const enemyRoster = rosterList.find(
-        roster => roster.attributes.won === 'true'
-      );
+      if (!playerParticipant) return;
 
-      const enemyTeammates = [];
-      enemyRoster.relationships.participants.data.forEach(participant => {
+      // format current player object
+      playerParticipant = {
+        stats: playerParticipant.attributes.stats,
+        id: playerParticipant.id
+      };
+
+      // find roster that player belongs to
+      const playerRoster = rosterList.find(roster => {
+        let found = false;
+        roster.relationships.participants.data.forEach(participant => {
+          if (participant.id === playerParticipant.id) found = true;
+        });
+        return found;
+      });
+
+      // find and format participant objects of player's teammates
+      const teammates = [];
+      playerRoster.relationships.participants.data.forEach(participant => {
         const id = participant.id;
         let teammateParticipant = participantList.find(teammate => {
           return teammate.id === id;
         });
 
-        enemyTeammates.push({
+        teammates.push({
           stats: teammateParticipant.attributes.stats,
           id: teammateParticipant.id
         });
       });
 
-      enemies = {
+      const team = {
         stats: {
-          won: enemyRoster.attributes.won === 'true',
-          rank: enemyRoster.attributes.stats.rank,
-          teamId: enemyRoster.attributes.stats.teamId
+          won: playerRoster.attributes.won === 'true',
+          rank: playerRoster.attributes.stats.rank,
+          teamId: playerRoster.attributes.stats.teamId
         },
-        teammates: enemyTeammates
+        teammates: teammates.sort(function(a, b) {
+          return a.id === playerParticipant.id
+            ? -1
+            : b.id == playerParticipant.id
+              ? 1
+              : 0;
+        })
       };
-    }
 
-    const telemUrl = rawMatch.included.find(element => {
-      return element.type === 'asset';
-    }).attributes.URL;
+      let enemies = {};
+      if (!team.stats.won) {
+        const enemyRoster = rosterList.find(
+          roster => roster.attributes.won == 'true'
+        );
 
-    let duration = new Date(null);
-    duration.setSeconds(rawMatch.data.attributes.duration);
-    matches.push({
-      gameMode: rawMatch.data.attributes.gameMode,
-      duration: duration,
-      date: new Date(rawMatch.data.attributes.createdAt),
-      map: rawMatch.data.attributes.mapName,
-      player: playerParticipant,
-      team: team,
-      enemies,
-      telemUrl
+        if (enemyRoster) {
+          const enemyTeammates = [];
+          enemyRoster.relationships.participants.data.forEach(participant => {
+            const id = participant.id;
+            let teammateParticipant = participantList.find(teammate => {
+              return teammate.id === id;
+            });
+
+            enemyTeammates.push({
+              stats: teammateParticipant.attributes.stats,
+              id: teammateParticipant.id
+            });
+          });
+
+          enemies = {
+            stats: {
+              won: enemyRoster.attributes.won === 'true',
+              rank: enemyRoster.attributes.stats.rank,
+              teamId: enemyRoster.attributes.stats.teamId
+            },
+            teammates: enemyTeammates
+          };
+        }
+      }
+
+      const telemUrl = rawMatch.included.find(element => {
+        return element.type === 'asset';
+      }).attributes.URL;
+
+      let duration = new Date(null);
+      duration.setSeconds(rawMatch.data.attributes.duration);
+      matches.push({
+        gameMode: rawMatch.data.attributes.gameMode,
+        duration: duration,
+        date: new Date(rawMatch.data.attributes.createdAt),
+        map: rawMatch.data.attributes.mapName,
+        player: playerParticipant,
+        team: team,
+        enemies,
+        telemUrl
+      });
     });
-  });
-  return matches.sort((a, b) => b.date - a.date);
+    return matches.sort((a, b) => b.date - a.date);
+  } catch (error) {
+    return matches.sort((a, b) => b.date - a.date);
+  }
 }
