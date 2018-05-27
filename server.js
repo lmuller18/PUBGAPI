@@ -449,7 +449,7 @@ function formatMatches(rawMatches, playerId) {
       let enemies = {};
       if (!team.stats.won) {
         const enemyRoster = rosterList.find(
-          roster => roster.attributes.won == 'true'
+          roster => roster.attributes.stats.rank === 1
         );
 
         if (enemyRoster) {
