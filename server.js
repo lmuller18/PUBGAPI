@@ -254,13 +254,16 @@ app.get('/api/telemetry', function(req, res) {
   reqProm(options)
     .then(response => {
       const telemetry = JSON.parse(response);
+
       const teamAttacks = {};
       const teamKills = {};
       const teamMovements = {};
+      const teamDamageMap = {};
 
       const enemyAttacks = {};
       const enemyKills = {};
       const enemyMovements = {};
+      const enemyDamageMap = {};
 
       teammateIds.forEach(player => {
         const jumpTime = telemetry.find(element => {
@@ -293,7 +296,24 @@ app.get('/api/telemetry', function(req, res) {
         });
 
         const aggregatedAttacks = {};
+        const damageMap = {};
         playerAttacks.forEach(attack => {
+          if (
+            attack.damageReason !== 'NonSpecific' &&
+            !aggregatedAttacks[attack.damageReason]
+          ) {
+            const sameBodyPart = playerAttacks.filter(bodyPart => {
+              return attack.damageReason === bodyPart.damageReason;
+            });
+            let damage = 0;
+            damageMap[attack.damageReason] = {
+              amount: sameBodyPart.reduce((accumulator, attack) => {
+                return accumulator + attack.damage;
+              }, damage),
+              bodyPart: attack.damageReason
+            };
+          }
+
           if (!aggregatedAttacks[attack.damageCauserName]) {
             const sameWeapon = playerAttacks.filter(weapon => {
               return attack.damageCauserName === weapon.damageCauserName;
@@ -309,6 +329,11 @@ app.get('/api/telemetry', function(req, res) {
         });
 
         teamAttacks[player] = Object.entries(aggregatedAttacks).reduce(
+          (arr, [key, value]) => [...arr, value],
+          []
+        );
+
+        teamDamageMap[player] = Object.entries(damageMap).reduce(
           (arr, [key, value]) => [...arr, value],
           []
         );
@@ -346,7 +371,24 @@ app.get('/api/telemetry', function(req, res) {
           });
 
           const aggregatedAttacks = {};
+          const damageMap = {};
           enemyAttacks.forEach(attack => {
+            if (
+              attack.damageReason !== 'NonSpecific' &&
+              !aggregatedAttacks[attack.damageReason]
+            ) {
+              const sameBodyPart = playerAttacks.filter(bodyPart => {
+                return attack.damageReason === bodyPart.damageReason;
+              });
+              let damage = 0;
+              damageMap[attack.damageReason] = {
+                amount: sameBodyPart.reduce((accumulator, attack) => {
+                  return accumulator + attack.damage;
+                }, damage),
+                bodyPart: attack.damageReason
+              };
+            }
+
             if (!aggregatedAttacks[attack.damageCauserName]) {
               const sameWeapon = enemyAttacks.filter(weapon => {
                 return attack.damageCauserName === weapon.damageCauserName;
@@ -365,15 +407,22 @@ app.get('/api/telemetry', function(req, res) {
             (arr, [key, value]) => [...arr, value],
             []
           );
+
+          enemyDamageMap[player] = Object.entries(damageMap).reduce(
+            (arr, [key, value]) => [...arr, value],
+            []
+          );
         });
       }
       res.status(200).json({
         teamAttacks,
         teamKills,
         teamMovements,
+        teamDamageMap,
         enemyAttacks,
         enemyKills,
-        enemyMovements
+        enemyMovements,
+        enemyDamageMap
       });
     })
     .catch(e => {
