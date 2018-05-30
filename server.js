@@ -377,7 +377,7 @@ app.get('/api/telemetry', function(req, res) {
               attack.damageReason !== 'NonSpecific' &&
               !aggregatedAttacks[attack.damageReason]
             ) {
-              const sameBodyPart = playerAttacks.filter(bodyPart => {
+              const sameBodyPart = enemyAttacks.filter(bodyPart => {
                 return attack.damageReason === bodyPart.damageReason;
               });
               let damage = 0;
