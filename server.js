@@ -330,10 +330,25 @@ app.get('/api/telemetry', function(req, res) {
           []
         );
 
-        teamDamageMap[player] = Object.entries(damageMap).reduce(
-          (arr, [key, value]) => [...arr, value],
-          []
-        );
+        let ordering = {},
+          sortOrder = [
+            'HeadShot',
+            'TorsoShot',
+            'ArmShot',
+            'PelvisShot',
+            'LegShot',
+            'NonSpecific'
+          ];
+        for (var i = 0; i < sortOrder.length; i++) ordering[sortOrder[i]] = i;
+
+        teamDamageMap[player] = Object.entries(damageMap)
+          .reduce((arr, [key, value]) => [...arr, value], [])
+          .sort(function(a, b) {
+            return (
+              ordering[a.bodyPart] - ordering[b.bodyPart] ||
+              a.name.localeCompare(b.bodyPart)
+            );
+          });
       });
 
       if (enemyIds) {
@@ -402,10 +417,25 @@ app.get('/api/telemetry', function(req, res) {
             []
           );
 
-          enemyDamageMap[player] = Object.entries(damageMap).reduce(
-            (arr, [key, value]) => [...arr, value],
-            []
-          );
+          let ordering = {},
+            sortOrder = [
+              'HeadShot',
+              'TorsoShot',
+              'ArmShot',
+              'PelvisShot',
+              'LegShot',
+              'NonSpecific'
+            ];
+          for (var i = 0; i < sortOrder.length; i++) ordering[sortOrder[i]] = i;
+
+          enemyDamageMap[player] = Object.entries(damageMap)
+            .reduce((arr, [key, value]) => [...arr, value], [])
+            .sort(function(a, b) {
+              return (
+                ordering[a.bodyPart] - ordering[b.bodyPart] ||
+                a.name.localeCompare(b.bodyPart)
+              );
+            });
         });
       }
       res.status(200).json({
