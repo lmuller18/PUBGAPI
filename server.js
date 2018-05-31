@@ -297,20 +297,34 @@ app.get('/api/telemetry', function(req, res) {
 
         const aggregatedAttacks = {};
         const damageMap = {};
-        playerAttacks.forEach(attack => {
-          if (!aggregatedAttacks[attack.damageReason]) {
-            const sameBodyPart = playerAttacks.filter(bodyPart => {
-              return attack.damageReason === bodyPart.damageReason;
-            });
+        const sortOrder = [
+          'HeadShot',
+          'TorsoShot',
+          'ArmShot',
+          'PelvisShot',
+          'LegShot',
+          'NonSpecific'
+        ];
+        sortOrder.forEach(bodyPart => {
+          const sameBodyPart = playerAttacks.filter(attack => {
+            return attack.damageReason === bodyPart;
+          });
+          if (sameBodyPart && sameBodyPart.length > 0) {
             let damage = 0;
-            damageMap[attack.damageReason] = {
+            damageMap[bodyPart] = {
               amount: sameBodyPart.reduce((accumulator, attack) => {
                 return accumulator + attack.damage;
               }, damage),
-              bodyPart: attack.damageReason
+              bodyPart
+            };
+          } else {
+            damageMap[bodyPart] = {
+              amount: 0,
+              bodyPart
             };
           }
-
+        });
+        playerAttacks.forEach(attack => {
           if (!aggregatedAttacks[attack.damageCauserName]) {
             const sameWeapon = playerAttacks.filter(weapon => {
               return attack.damageCauserName === weapon.damageCauserName;
@@ -330,15 +344,7 @@ app.get('/api/telemetry', function(req, res) {
           []
         );
 
-        let ordering = {},
-          sortOrder = [
-            'HeadShot',
-            'TorsoShot',
-            'ArmShot',
-            'PelvisShot',
-            'LegShot',
-            'NonSpecific'
-          ];
+        let ordering = {};
         for (var i = 0; i < sortOrder.length; i++) ordering[sortOrder[i]] = i;
 
         teamDamageMap[player] = Object.entries(damageMap)
@@ -384,20 +390,35 @@ app.get('/api/telemetry', function(req, res) {
 
           const aggregatedAttacks = {};
           const damageMap = {};
-          enemyAttacks.forEach(attack => {
-            if (!aggregatedAttacks[attack.damageReason]) {
-              const sameBodyPart = enemyAttacks.filter(bodyPart => {
-                return attack.damageReason === bodyPart.damageReason;
-              });
+          const sortOrder = [
+            'HeadShot',
+            'TorsoShot',
+            'ArmShot',
+            'PelvisShot',
+            'LegShot',
+            'NonSpecific'
+          ];
+          sortOrder.forEach(bodyPart => {
+            const sameBodyPart = enemyAttacks.filter(attack => {
+              return attack.damageReason === bodyPart;
+            });
+            if (sameBodyPart && sameBodyPart.length > 0) {
               let damage = 0;
-              damageMap[attack.damageReason] = {
+              damageMap[bodyPart] = {
                 amount: sameBodyPart.reduce((accumulator, attack) => {
                   return accumulator + attack.damage;
                 }, damage),
-                bodyPart: attack.damageReason
+                bodyPart
+              };
+            } else {
+              damageMap[bodyPart] = {
+                amount: 0,
+                bodyPart
               };
             }
+          });
 
+          enemyAttacks.forEach(attack => {
             if (!aggregatedAttacks[attack.damageCauserName]) {
               const sameWeapon = enemyAttacks.filter(weapon => {
                 return attack.damageCauserName === weapon.damageCauserName;
@@ -417,15 +438,7 @@ app.get('/api/telemetry', function(req, res) {
             []
           );
 
-          let ordering = {},
-            sortOrder = [
-              'HeadShot',
-              'TorsoShot',
-              'ArmShot',
-              'PelvisShot',
-              'LegShot',
-              'NonSpecific'
-            ];
+          let ordering = {};
           for (var i = 0; i < sortOrder.length; i++) ordering[sortOrder[i]] = i;
 
           enemyDamageMap[player] = Object.entries(damageMap)
