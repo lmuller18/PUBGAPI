@@ -66,7 +66,7 @@ function handleError(res, reason, message, code) {
 
 app.get('/api/seasons', function(req, res) {
   const shard = `${req.query.platform}-${req.query.region}`;
-  const seasonKey = `season-list`;
+  const seasonKey = `season-list: ${shard}`;
   cacheReady
     .then(seasonListCache => {
       return seasonListCache
