@@ -188,44 +188,43 @@ app.get('/api/matches', function(req, res) {
   const matchIds = req.query.matches.split('|');
   const playerId = req.query.playerId;
   const shard = `${req.query.platform}-${req.query.region}`;
-  const matchesToSearch = 3;
   const key = `matches:${req.query.matches}`;
   // const key = `matches:${req.query.matches}`;
   const rawMatches = [];
-  let searchedMatches = 0;
 
   Promise.all(
     matchIds.map(matchId => {
-      if (searchedMatches <= matchesToSearch) {
-        const key = `match:${matchId}`;
-        return cacheReady.then(cache => {
-          return cache
-            .wrap(
-              key,
-              () => {
-                searchedMatches++;
-                options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
-                return reqProm(options)
-                  .then(response => {
-                    return JSON.parse(response);
-                  })
-                  .catch(e => {
-                    return null;
-                  });
-              },
-              { ttl: 1000 * 1000 }
-            )
-            .then(match => {
-              if (match) {
-                rawMatches.push(match);
-              }
-            });
-        });
-      }
+      const key = `match:${matchId}`;
+      return cacheReady.then(cache => {
+        return cache
+          .wrap(
+            key,
+            () => {
+              options.uri = `https://${apiURL}/shards/${shard}/matches/${matchId}`;
+              return reqProm(options)
+                .then(response => {
+                  return JSON.parse(response);
+                })
+                .catch(e => {
+                  return null;
+                });
+            },
+            { ttl: 1000 * 1000 }
+          )
+          .then(match => {
+            if (match) {
+              rawMatches.push(match);
+            }
+          });
+      });
     })
   )
     .then(results => {
-      if (rawMatches.length > 1) {
+      if (
+        rawMatches.length > 0 &&
+        rawMatches[0].data &&
+        rawMatches[0].data.attributes
+      ) {
         res.status(200).json({ matches: formatMatches(rawMatches, playerId) });
       } else {
         res.status(404).json({ error: 'no matches' });
