@@ -284,6 +284,7 @@ app.get('/api/telemetry', function(req, res) {
         const playerAttacks = telemetry.filter(element => {
           return (
             element._T === 'LogPlayerTakeDamage' &&
+            element.attacker &&
             element.attacker.name === player
           );
         });
@@ -377,6 +378,7 @@ app.get('/api/telemetry', function(req, res) {
           const enemyAttacks = telemetry.filter(element => {
             return (
               element._T === 'LogPlayerTakeDamage' &&
+              element.attacker &&
               element.attacker.name === player
             );
           });
