@@ -1,5 +1,4 @@
 var express = require('express');
-var https = require('https');
 var bodyParser = require('body-parser');
 var reqProm = require('request-promise');
 require('dotenv').config();
