@@ -248,8 +248,11 @@ app.get('/api/telemetry', function(req, res) {
   } else {
     enemyIds = null;
   }
-
   options.uri = telemUri;
+  options.headers = {
+    'Accept-Encoding': 'gzip'
+  };
+  options.gzip = true;
   reqProm(options)
     .then(response => {
       const telemetry = JSON.parse(response);
