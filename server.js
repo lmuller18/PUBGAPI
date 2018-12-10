@@ -32,7 +32,7 @@ var server = app.listen(process.env.PORT || 8080, function() {
 const apiURL = 'api.playbattlegrounds.com';
 const headers = {
   Accept: 'application/vnd.api+json',
-  Authorization: `Bearer ${apiKey}`
+  Authorization: `Bearer ${apiKey}`,
 };
 
 var cacheManager = require('cache-manager');
@@ -45,16 +45,16 @@ const cacheReady = new Promise((resolve, reject) => {
       ttl: 300,
       maxsize: 1000 * 1000 * 1000 /* max size in bytes on disk */,
       path: './cache',
-      fillcallback: () => resolve(cache)
-    }
+      fillcallback: () => resolve(cache),
+    },
   });
 });
 
 const options = {
   headers: {
     Accept: 'application/vnd.api+json',
-    Authorization: `Bearer ${apiKey}`
-  }
+    Authorization: `Bearer ${apiKey}`,
+  },
 };
 
 // Generic error handler used by all endpoints.
@@ -117,6 +117,7 @@ app.get('/api/player-details/:id', function(req, res) {
                 return JSON.parse(response);
               })
               .catch(e => {
+                console.log('error: ', e);
                 return JSON.parse(e);
               });
           },
@@ -144,7 +145,7 @@ app.get('/api/player-details/:id', function(req, res) {
  *   get player by id
  */
 app.get('/api/player/:id', function(req, res) {
-  const shard = `${req.query.platform}-${req.query.region}`;
+  const shard = `${req.query.platform}`;
   const username = req.params.id;
 
   const key = `player:${shard}-${username}`;
@@ -167,7 +168,7 @@ app.get('/api/player/:id', function(req, res) {
             id: rawPlayer.data[0].id,
             region: req.query.region,
             platform: req.query.platform,
-            matches: rawPlayer.data[0].relationships.matches.data
+            matches: rawPlayer.data[0].relationships.matches.data,
           };
           res.status(200).json({ player });
         } else {
@@ -249,7 +250,7 @@ app.get('/api/telemetry', function(req, res) {
   }
   options.uri = telemUri;
   options.headers = {
-    'Accept-Encoding': 'gzip'
+    'Accept-Encoding': 'gzip',
   };
   options.gzip = true;
   reqProm(options)
@@ -305,7 +306,7 @@ app.get('/api/telemetry', function(req, res) {
           'ArmShot',
           'PelvisShot',
           'LegShot',
-          'NonSpecific'
+          'NonSpecific',
         ];
         sortOrder.forEach(bodyPart => {
           const sameBodyPart = playerAttacks.filter(attack => {
@@ -317,12 +318,12 @@ app.get('/api/telemetry', function(req, res) {
               amount: sameBodyPart.reduce((accumulator, attack) => {
                 return accumulator + attack.damage;
               }, damage),
-              bodyPart
+              bodyPart,
             };
           } else {
             damageMap[bodyPart] = {
               amount: 0,
-              bodyPart
+              bodyPart,
             };
           }
         });
@@ -399,7 +400,7 @@ app.get('/api/telemetry', function(req, res) {
             'ArmShot',
             'PelvisShot',
             'LegShot',
-            'NonSpecific'
+            'NonSpecific',
           ];
           sortOrder.forEach(bodyPart => {
             const sameBodyPart = enemyAttacks.filter(attack => {
@@ -411,12 +412,12 @@ app.get('/api/telemetry', function(req, res) {
                 amount: sameBodyPart.reduce((accumulator, attack) => {
                   return accumulator + attack.damage;
                 }, damage),
-                bodyPart
+                bodyPart,
               };
             } else {
               damageMap[bodyPart] = {
                 amount: 0,
-                bodyPart
+                bodyPart,
               };
             }
           });
@@ -462,7 +463,7 @@ app.get('/api/telemetry', function(req, res) {
         enemyAttacks,
         enemyKills,
         enemyMovements,
-        enemyDamageMap
+        enemyDamageMap,
       });
     })
     .catch(e => {
@@ -494,7 +495,7 @@ function formatMatches(rawMatches, playerId) {
       // format current player object
       playerParticipant = {
         stats: playerParticipant.attributes.stats,
-        id: playerParticipant.id
+        id: playerParticipant.id,
       };
 
       // find roster that player belongs to
@@ -516,7 +517,7 @@ function formatMatches(rawMatches, playerId) {
 
         teammates.push({
           stats: teammateParticipant.attributes.stats,
-          id: teammateParticipant.id
+          id: teammateParticipant.id,
         });
       });
 
@@ -524,15 +525,15 @@ function formatMatches(rawMatches, playerId) {
         stats: {
           won: playerRoster.attributes.won === 'true',
           rank: playerRoster.attributes.stats.rank,
-          teamId: playerRoster.attributes.stats.teamId
+          teamId: playerRoster.attributes.stats.teamId,
         },
         teammates: teammates.sort(function(a, b) {
           return a.id === playerParticipant.id
             ? -1
             : b.id == playerParticipant.id
-              ? 1
-              : 0;
-        })
+            ? 1
+            : 0;
+        }),
       };
 
       let enemies = {};
@@ -551,7 +552,7 @@ function formatMatches(rawMatches, playerId) {
 
             enemyTeammates.push({
               stats: teammateParticipant.attributes.stats,
-              id: teammateParticipant.id
+              id: teammateParticipant.id,
             });
           });
 
@@ -559,9 +560,9 @@ function formatMatches(rawMatches, playerId) {
             stats: {
               won: enemyRoster.attributes.won === 'true',
               rank: enemyRoster.attributes.stats.rank,
-              teamId: enemyRoster.attributes.stats.teamId
+              teamId: enemyRoster.attributes.stats.teamId,
             },
-            teammates: enemyTeammates
+            teammates: enemyTeammates,
           };
         }
       }
@@ -580,7 +581,7 @@ function formatMatches(rawMatches, playerId) {
         player: playerParticipant,
         team: team,
         enemies,
-        telemUrl
+        telemUrl,
       });
     });
     return matches.sort((a, b) => b.date - a.date);
